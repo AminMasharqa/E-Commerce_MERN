@@ -26,3 +26,16 @@ export const seedInitialProducts = async () => {
         await productModel.insertMany(products);
     }
 };
+
+
+// Open src/services/productService.ts and add a new function without tests:
+export const searchProducts = async (searchTerm: string) => {
+    if (!searchTerm || searchTerm.trim() === '') {
+      return await getAllProducts();
+    }
+    
+    // This code adds a branch that won't be covered by tests
+    return await productModel.find({
+      title: { $regex: searchTerm, $options: 'i' }
+    });
+  };
