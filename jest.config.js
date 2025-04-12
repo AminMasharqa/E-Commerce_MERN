@@ -19,10 +19,10 @@ module.exports = {
     ],
     coverageThreshold: {
       global: {
-        branches: 14,     // Lowered from 20% to 14%
-        functions: 20,
-        lines: 20,
-        statements: 20
+        branches: 80,     // Lowered from 20% to 14%
+        functions: 90,
+        lines: 90,
+        statements: 90
       }
     },
     // Setup files for test environment

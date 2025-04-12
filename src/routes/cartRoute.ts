@@ -1,6 +1,10 @@
 import express, { Request, Response, NextFunction } from "express";
-import { addItemToCart, getActiveCartForUser } from "../services/cartService";
-import validateJWT from "../middlewares/validateJWT";
+import {
+  addItemToCart,
+  getActiveCartForUser,
+  updateItemInCart,
+} from "../services/cartService";
+import {validateJWT} from "../middlewares/validateJWT";
 import { ExtendRequest } from "../types/extendedRequest";
 
 const router = express.Router();
@@ -27,30 +31,57 @@ router.get(
   }
 );
 
-router.post("/items", validateJWT, async (req: ExtendRequest, res: Response) => {
+router.post(
+  "/items",
+  validateJWT,
+  async (req: ExtendRequest, res: Response) => {
+    try {
+      const userId = req?.user?._id;
+      const { productId, quantity } = req.body;
+
+      const response = await addItemToCart({ userId, productId, quantity });
+
+      // Handle different response types correctly:
+      if (typeof response.data === "string") {
+        // For string responses, set the content type explicitly
+        res
+          .status(response.statusCode || 500)
+          .contentType("text/plain")
+          .send(response.data);
+      } else if (response.data === null || response.data === undefined) {
+        // Handle null/undefined
+        res.status(response.statusCode || 500).end();
+      } else {
+        // For object responses, use json()
+        res.status(response.statusCode || 500).json(response.data);
+      }
+    } catch (error) {
+      console.error("Error adding item to cart:", error);
+      res.status(500).send("An unexpected error occurred");
+    }
+  }
+);
+
+
+// Then in your route handler:
+router.put("/items", validateJWT, async (req: ExtendRequest, res: Response) => {
   try {
     const userId = req?.user?._id;
     const { productId, quantity } = req.body;
-
-    const response = await addItemToCart({ userId, productId, quantity });
     
-    // Handle different response types correctly:
-    if (typeof response.data === 'string') {
-      // For string responses, set the content type explicitly
-      res.status(response.statusCode || 500)
-         .contentType('text/plain')
-         .send(response.data);
-    } else if (response.data === null || response.data === undefined) {
-      // Handle null/undefined
-      res.status(response.statusCode || 500).end();
-    } else {
-      // For object responses, use json()
-      res.status(response.statusCode || 500).json(response.data);
+    // Validate required fields
+    if (!productId || quantity === undefined) {
+      res.status(400).json({ error: "Missing required fields" });
+      return; // Return without a value
     }
+
+    const response = await updateItemInCart({ userId, productId, quantity });
+    res.status(response.statusCode || 200).send(response.data);
+    // No return statement here
   } catch (error) {
-    console.error("Error adding item to cart:", error);
-    res.status(500).send("An unexpected error occurred");
+    console.error("Error updating item in cart:", error);
+    res.status(500).json({ error: "An unexpected error occurred" });
+    // No return statement here
   }
 });
-
 export default router;

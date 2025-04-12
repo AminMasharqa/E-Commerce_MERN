@@ -3,7 +3,16 @@ import request from "supertest";
 import express from "express";
 import cartRoute from "../../routes/cartRoute";
 import * as cartService from "../../services/cartService";
-import validateJWT from "../../middlewares/validateJWT";
+import {validateJWT} from "../../middlewares/validateJWT";
+
+
+// Add to your mock setup at the top of the test file
+jest.mock("../../services/cartService", () => ({
+    getActiveCartForUser: jest.fn(),
+    addItemToCart: jest.fn(),
+    updateItemInCart: jest.fn()
+    // Include any other functions you're mocking
+  }));
 
 // Mock dependencies
 jest.mock("../../services/cartService");
@@ -69,6 +78,91 @@ describe("Cart Routes", () => {
       
       expect(response.status).toBe(500);
       expect(response.text).toBe("An error occurred while fetching the cart");
+    });
+  });
+
+
+  // Test for PUT /cart/items route
+describe("PUT /cart/items", () => {
+    it("should update item quantity in cart successfully", async () => {
+      const mockResponse = {
+        statusCode: 200,
+        data: {
+          _id: "cart123",
+          userId: "testuser123",
+          items: [{ 
+            product: { _id: "product123", title: "Test Product" }, 
+            quantity: 5, 
+            unitPrice: 10 
+          }],
+          totalAmount: 50,
+          status: "active"
+        }
+      };
+      
+      (cartService.updateItemInCart as jest.Mock).mockResolvedValueOnce(mockResponse);
+      
+      const response = await request(app)
+        .put("/cart/items")
+        .send({
+          productId: "product123",
+          quantity: 5
+        });
+      
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual(mockResponse.data);
+      expect(cartService.updateItemInCart).toHaveBeenCalledWith({
+        userId: "testuser123",
+        productId: "product123",
+        quantity: 5
+      });
+    });
+  
+    it("should handle item not found in cart", async () => {
+      const mockResponse = {
+        statusCode: 404,
+        data: "Item not found in cart"
+      };
+      
+      (cartService.updateItemInCart as jest.Mock).mockResolvedValueOnce(mockResponse);
+      
+      const response = await request(app)
+        .put("/cart/items")
+        .send({
+          productId: "nonexistent",
+          quantity: 5
+        });
+      
+      expect(response.status).toBe(404);
+      expect(response.text).toBe("Item not found in cart");
+    });
+  
+    it("should handle missing required fields", async () => {
+      const response = await request(app)
+        .put("/cart/items")
+        .send({
+          // Missing productId
+          quantity: 5
+        });
+      
+      expect(response.status).toBe(400);
+      expect(response.body).toHaveProperty("error");
+    });
+  
+    it("should handle server errors", async () => {
+      (cartService.updateItemInCart as jest.Mock).mockRejectedValueOnce(
+        new Error("Database error")
+      );
+      
+      const response = await request(app)
+        .put("/cart/items")
+        .send({
+          productId: "product123",
+          quantity: 5
+        });
+      
+      expect(response.status).toBe(500);
+      expect(response.body).toHaveProperty("error");
     });
   });
 
