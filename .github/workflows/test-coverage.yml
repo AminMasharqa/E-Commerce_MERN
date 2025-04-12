@@ -21,6 +21,9 @@ jobs:
           
       - name: Install dependencies
         run: npm ci
+
+      - name: List test files
+        run: find src -name "*.test.ts" -type f
         
       - name: Run tests with coverage
         run: npm run test:coverage
