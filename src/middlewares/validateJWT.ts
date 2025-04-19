@@ -46,8 +46,14 @@ export const validateJWT = (
   } catch (err) {
     console.error("JWT validation error:", err);
     
+    // Use instanceof with proper error type checking
     if (err instanceof jwt.JsonWebTokenError) {
-      res.status(401).json({ error: "Invalid token" });
+      // Ensure specific error messages for different JWT errors
+      if (err.name === 'TokenExpiredError') {
+        res.status(401).json({ error: "Token expired" });
+      } else {
+        res.status(401).json({ error: "Invalid token" });
+      }
     } else if (err instanceof jwt.TokenExpiredError) {
       res.status(401).json({ error: "Token expired" });
     } else {

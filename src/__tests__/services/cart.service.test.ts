@@ -213,8 +213,8 @@ describe("deletItemInCart - Additional tests", () => {
   });
 
   it("should handle try/catch internally", async () => {
-    // First call to getActiveCartForUser succeeds
-    (cartModel.findOne as jest.Mock).mockResolvedValueOnce({
+    // Mock cart with an item to delete
+    const mockCart = {
       userId: "user123",
       items: [
         {
@@ -225,26 +225,19 @@ describe("deletItemInCart - Additional tests", () => {
       ],
       totalAmount: 20,
       status: "active",
-      save: jest.fn(),
-    });
+      save: jest.fn().mockRejectedValue(new Error("Failed to save cart")),
+    };
 
-    // Error when saving
-    const saveError = new Error("Failed to save cart");
-    (cartModel.prototype.save as jest.Mock) = jest
-      .fn()
-      .mockRejectedValue(saveError);
+    // Mock findOne to return our cart
+    (cartModel.findOne as jest.Mock).mockResolvedValue(mockCart);
 
-    try {
-      await deletItemInCart({
+    // Expect the method to throw an error when save fails
+    await expect(
+      deletItemInCart({
         productId: "product123",
         userId: "user123",
-      });
-    } catch (error) {
-      // This test ensures we catch errors in deletItemInCart
-      // even if not explicitly handled with try/catch
-      expect(error).toBeDefined();
-      // expect(error.message).toBe("Failed to save cart");
-    }
+      })
+    ).rejects.toThrow("Failed to save cart");
   });
 });
 
