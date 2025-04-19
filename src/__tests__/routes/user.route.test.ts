@@ -1,114 +1,125 @@
-import express from 'express';
-import request from 'supertest';
-import userRouter from '../../routes/userRoute';
-import * as userService from '../../services/userService';
+import request from "supertest";
+import express from "express";
+import userRoute from "../../routes/userRoute";
+import * as userService from "../../services/userService";
 
-// Mock the userService
-jest.mock('../../services/userService');
+// Mock services
+jest.mock("../../services/userService");
 
-describe('User Routes', () => {
-  let app: express.Express;
+describe("User Routes", () => {
+  let app: express.Application;
 
   beforeEach(() => {
+    // Reset mocks
+    jest.clearAllMocks();
+    
+    // Create a fresh express application for testing
     app = express();
     app.use(express.json());
-    app.use('/user', userRouter);
-
-    // Clear all mocks before each test
-    jest.clearAllMocks();
+    app.use("/user", userRoute);
   });
 
-  describe('POST /user/register', () => {
-    it('should successfully register a user', async () => {
-      // Mock the register service method
+  describe("POST /user/register", () => {
+    it("should register a new user successfully", async () => {
+      // Mock the service response
+      const mockToken = "mocked.jwt.token";
       (userService.register as jest.Mock).mockResolvedValue({
-        statusCode: 200,
-        data: 'mockToken'
+        data: mockToken,
+        statusCode: 200
       });
-
-      const registerData = {
-        firstName: 'John',
-        lastName: 'Doe',
-        email: 'john@example.com',
-        password: 'password123'
+      
+      // Test data
+      const userData = {
+        firstName: "John",
+        lastName: "Doe",
+        email: "john.doe@example.com",
+        password: "password123"
       };
-
+      
+      // Make request
       const response = await request(app)
-        .post('/user/register')
-        .send(registerData);
-
-      expect(response.statusCode).toBe(200);
-      expect(response.text).toBe('mockToken');
-
-      // Verify the service method was called with correct parameters
-      expect(userService.register).toHaveBeenCalledWith(registerData);
+        .post("/user/register")
+        .send(userData);
+      
+      // Assertions
+      expect(response.status).toBe(200);
+      expect(response.text).toBe(mockToken);
+      expect(userService.register).toHaveBeenCalledWith(userData);
     });
 
-    it('should handle registration failure', async () => {
-      // Mock the register service method to return an error
+    it("should return error if registration fails", async () => {
+      // Mock service to return an error
       (userService.register as jest.Mock).mockResolvedValue({
-        statusCode: 400,
-        data: 'User Already exists!'
+        data: "User Already exists!",
+        statusCode: 400
       });
-
-      const registerData = {
-        firstName: 'John',
-        lastName: 'Doe',
-        email: 'existing@example.com',
-        password: 'password123'
+      
+      // Test data
+      const userData = {
+        firstName: "John",
+        lastName: "Doe",
+        email: "existing@example.com",
+        password: "password123"
       };
-
+      
+      // Make request
       const response = await request(app)
-        .post('/user/register')
-        .send(registerData);
-
-      expect(response.statusCode).toBe(400);
-      expect(response.text).toBe('User Already exists!');
+        .post("/user/register")
+        .send(userData);
+      
+      // Assertions
+      expect(response.status).toBe(400);
+      expect(response.text).toBe("User Already exists!");
     });
   });
 
-  describe('POST /user/login', () => {
-    it('should successfully login a user', async () => {
-      // Mock the login service method
+  describe("POST /user/login", () => {
+    it("should login user successfully with correct credentials", async () => {
+      // Mock the service response
+      const mockToken = "mocked.jwt.token";
       (userService.login as jest.Mock).mockResolvedValue({
-        statusCode: 200,
-        data: 'mockToken'
+        data: mockToken,
+        statusCode: 200
       });
-
+      
+      // Test data
       const loginData = {
-        email: 'john@example.com',
-        password: 'password123'
+        email: "john.doe@example.com",
+        password: "password123"
       };
-
+      
+      // Make request
       const response = await request(app)
-        .post('/user/login')
+        .post("/user/login")
         .send(loginData);
-
-      expect(response.statusCode).toBe(200);
-      expect(response.text).toBe('mockToken');
-
-      // Verify the service method was called with correct parameters
+      
+      // Assertions
+      expect(response.status).toBe(200);
+      expect(response.text).toBe(mockToken);
       expect(userService.login).toHaveBeenCalledWith(loginData);
     });
 
-    it('should handle login failure', async () => {
-      // Mock the login service method to return an error
+    it("should return error with incorrect credentials", async () => {
+      // Mock service to return an error
       (userService.login as jest.Mock).mockResolvedValue({
-        statusCode: 401,
-        data: 'Incorrect email or password!'
+        data: "Incorrect email or password!",
+        statusCode: 401
       });
-
+      
+      // Test data
       const loginData = {
-        email: 'wrong@example.com',
-        password: 'wrongpassword'
+        email: "john.doe@example.com",
+        password: "wrongPassword"
       };
-
+      
+      // Make request
       const response = await request(app)
-        .post('/user/login')
+        .post("/user/login")
         .send(loginData);
-
-      expect(response.statusCode).toBe(401);
-      expect(response.text).toBe('Incorrect email or password!');
+      
+      // Assertions
+      expect(response.status).toBe(401);
+      expect(response.text).toBe("Incorrect email or password!");
     });
   });
 });

@@ -1,9 +1,7 @@
-// src/__tests__/services/product.service.test.ts
-
-import * as productService from '../../services/productService';
 import productModel from '../../models/productModel';
+import { getAllProducts, seedInitialProducts, searchProducts } from '../../services/productService';
 
-// Mock the productModel
+// Mock productModel
 jest.mock('../../models/productModel', () => ({
   __esModule: true,
   default: {
@@ -12,78 +10,139 @@ jest.mock('../../models/productModel', () => ({
   }
 }));
 
-// Mock data for reuse across tests
-const mockProducts = [
-  { _id: '1', title: 'Test Product 1', image: 'image1.jpg', price: 10, stock: 100 },
-  { _id: '2', title: 'Test Product 2', image: 'image2.jpg', price: 20, stock: 200 }
-];
-
 describe('Product Service', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    // Default mock implementation for commonly used methods
-    (productModel.find as jest.Mock).mockResolvedValue(mockProducts);
   });
 
-  // Group tests by function
   describe('getAllProducts', () => {
     it('should return all products', async () => {
-      const result = await productService.getAllProducts();
+      // Mock data
+      const mockProducts = [
+        { _id: 'product1', title: 'Dell Laptop', price: 10, stock: 100 },
+        { _id: 'product2', title: 'HP Laptop', price: 20, stock: 200 }
+      ];
       
-      expect(productModel.find).toHaveBeenCalledTimes(1);
+      // Setup mock
+      (productModel.find as jest.Mock).mockResolvedValue(mockProducts);
+      
+      // Execute
+      const result = await getAllProducts();
+      
+      // Assert
+      expect(productModel.find).toHaveBeenCalled();
       expect(result).toEqual(mockProducts);
     });
 
-    it('should handle errors when getting products', async () => {
-      const errorMessage = 'Database error';
-      (productModel.find as jest.Mock).mockRejectedValueOnce(new Error(errorMessage));
+    it('should handle errors', async () => {
+      // Setup mock to throw error
+      (productModel.find as jest.Mock).mockRejectedValue(new Error('Database error'));
       
-      await expect(productService.getAllProducts()).rejects.toThrow(errorMessage);
-      expect(productModel.find).toHaveBeenCalledTimes(1);
+      // Execute and assert
+      await expect(getAllProducts()).rejects.toThrow('Database error');
     });
   });
 
   describe('seedInitialProducts', () => {
-    it('should seed products when database is empty', async () => {
-      // Override the default mock for this specific test
-      (productModel.find as jest.Mock).mockResolvedValueOnce([]);
+    it('should seed products when none exist', async () => {
+      // Mock empty products list
+      (productModel.find as jest.Mock).mockResolvedValue([]);
       
-      await productService.seedInitialProducts();
+      // Execute
+      await seedInitialProducts();
       
-      expect(productModel.find).toHaveBeenCalledTimes(1);
-      expect(productModel.insertMany).toHaveBeenCalledTimes(1);
+      // Assert
+      expect(productModel.find).toHaveBeenCalled();
+      expect(productModel.insertMany).toHaveBeenCalled();
+      // Check that it inserted the sample Dell laptop
+      expect(productModel.insertMany).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            title: 'Dell labtop ',
+            price: 10,
+            stock: 100
+          })
+        ])
+      );
     });
 
-    it('should not seed products when database already has products', async () => {
-      await productService.seedInitialProducts();
+    it('should not seed products when products already exist', async () => {
+      // Mock existing products
+      const mockProducts = [
+        { _id: 'product1', title: 'Existing Product', price: 10, stock: 100 }
+      ];
+      (productModel.find as jest.Mock).mockResolvedValue(mockProducts);
       
-      expect(productModel.find).toHaveBeenCalledTimes(1);
+      // Execute
+      await seedInitialProducts();
+      
+      // Assert
+      expect(productModel.find).toHaveBeenCalled();
       expect(productModel.insertMany).not.toHaveBeenCalled();
     });
   });
 
   describe('searchProducts', () => {
     it('should return all products when search term is empty', async () => {
-      const result = await productService.searchProducts('');
+      // Mock data
+      const mockProducts = [
+        { _id: 'product1', title: 'Dell Laptop', price: 10, stock: 100 },
+        { _id: 'product2', title: 'HP Laptop', price: 20, stock: 200 }
+      ];
       
-      expect(productModel.find).toHaveBeenCalledWith();
-      expect(result).toEqual(mockProducts);
+      // Setup mock
+      (productModel.find as jest.Mock).mockResolvedValue(mockProducts);
+      
+      // Test with empty string
+      const result1 = await searchProducts('');
+      expect(productModel.find).toHaveBeenCalledTimes(1);
+      expect(result1).toEqual(mockProducts);
+      
+      // Reset mock counter
+      jest.clearAllMocks();
+      
+      // Test with undefined
+      const result2 = await searchProducts(undefined as any);
+      expect(productModel.find).toHaveBeenCalledTimes(1);
+      expect(result2).toEqual(mockProducts);
     });
 
-    it('should search products by title when search term is provided', async () => {
-      const searchTerm = 'laptop';
-      await productService.searchProducts(searchTerm);
+    it('should search products by title with regex', async () => {
+      // Mock filtered products
+      const mockFilteredProducts = [
+        { _id: 'product1', title: 'Dell Laptop', price: 10, stock: 100 }
+      ];
       
+      // Setup mock
+      (productModel.find as jest.Mock).mockResolvedValue(mockFilteredProducts);
+      
+      // Execute
+      const result = await searchProducts('Dell');
+      
+      // Assert
       expect(productModel.find).toHaveBeenCalledWith({
-        title: { $regex: searchTerm, $options: 'i' }
+        title: { $regex: 'Dell', $options: 'i' }
       });
+      expect(result).toEqual(mockFilteredProducts);
+    });
+
+    it('should handle whitespace in search term', async () => {
+      // Mock filtered products
+      const mockFilteredProducts = [
+        { _id: 'product1', title: 'Dell Laptop', price: 10, stock: 100 }
+      ];
+      
+      // Setup mock
+      (productModel.find as jest.Mock).mockResolvedValue(mockFilteredProducts);
+      
+      // Execute with whitespace
+      const result = await searchProducts('   Dell   ');
+      
+      // Assert
+      expect(productModel.find).toHaveBeenCalledWith({
+        title: { $regex: '   Dell   ', $options: 'i' }
+      });
+      expect(result).toEqual(mockFilteredProducts);
     });
   });
-
-  // When adding a new function, simply add a new describe block here
-  // describe('newFunction', () => {
-  //   it('should ...', async () => {
-  //     // Test implementation
-  //   });
-  // });
 });

@@ -1,43 +1,74 @@
-import express, { Request, Response, NextFunction } from "express";
+import express, { Response, NextFunction } from "express";
 import {
   addItemToCart,
+  deletItemInCart,
   getActiveCartForUser,
   updateItemInCart,
 } from "../services/cartService";
-import {validateJWT} from "../middlewares/validateJWT";
-import { ExtendRequest } from "../types/extendedRequest";
+import { validateJWT, ExtendRequest } from "../middlewares/validateJWT";
 
 const router = express.Router();
 
+// Helper function to safely get user ID from request
+function getUserIdFromRequest(req: ExtendRequest): string | null {
+  if (req.user && req.user._id) {
+    return req.user._id.toString();
+  }
+  return null;
+}
+
+// Debug route to verify token and user information
+router.get(
+  "/debug-token",
+  validateJWT,
+  (req: ExtendRequest, res: Response) => {
+    res.json({
+      user: req.user,
+      message: "Token is valid"
+    });
+  }
+);
+
+// Get active cart for user
 router.get(
   "/",
   validateJWT,
   async (req: ExtendRequest, res: Response, next: NextFunction) => {
     try {
-      // Get the userId from the user object attached by validateJWT middleware
-      const userId = req.user?._id;
+      const userId = getUserIdFromRequest(req);
 
       if (!userId) {
-        res.status(400).send("User ID not found in token");
+        res.status(400).json({ error: "User ID not found in token" });
         return;
       }
 
-      const cart = await getActiveCartForUser({ userId: userId.toString() });
+      const cart = await getActiveCartForUser({ userId });
       res.status(200).json(cart);
     } catch (error) {
       console.error("Error fetching cart:", error);
-      res.status(500).send("An error occurred while fetching the cart");
+      res.status(500).json({ error: "An error occurred while fetching the cart" });
     }
   }
 );
 
+// Add item to cart
 router.post(
   "/items",
   validateJWT,
   async (req: ExtendRequest, res: Response) => {
     try {
-      const userId = req?.user?._id;
+      const userId = getUserIdFromRequest(req);
+      if (!userId) {
+        res.status(400).json({ error: "User ID not found in token" });
+        return;
+      }
+
       const { productId, quantity } = req.body;
+      
+      if (!productId || quantity === undefined) {
+        res.status(400).json({ error: "Missing required fields" });
+        return;
+      }
 
       const response = await addItemToCart({ userId, productId, quantity });
 
@@ -57,31 +88,60 @@ router.post(
       }
     } catch (error) {
       console.error("Error adding item to cart:", error);
-      res.status(500).send("An unexpected error occurred");
+      res.status(500).json({ error: "An unexpected error occurred" });
     }
   }
 );
 
+// Update item in cart
+router.put(
+  "/items", 
+  validateJWT, 
+  async (req: ExtendRequest, res: Response) => {
+    try {
+      const userId = getUserIdFromRequest(req);
+      if (!userId) {
+        res.status(400).json({ error: "User ID not found in token" });
+        return;
+      }
 
-// Then in your route handler:
-router.put("/items", validateJWT, async (req: ExtendRequest, res: Response) => {
-  try {
-    const userId = req?.user?._id;
-    const { productId, quantity } = req.body;
-    
-    // Validate required fields
-    if (!productId || quantity === undefined) {
-      res.status(400).json({ error: "Missing required fields" });
-      return; // Return without a value
+      const { productId, quantity } = req.body;
+
+      // Validate required fields
+      if (!productId || quantity === undefined) {
+        res.status(400).json({ error: "Missing required fields" });
+        return;
+      }
+
+      const response = await updateItemInCart({ userId, productId, quantity });
+      res.status(response.statusCode || 200).send(response.data);
+    } catch (error) {
+      console.error("Error updating item in cart:", error);
+      res.status(500).json({ error: "An unexpected error occurred" });
     }
-
-    const response = await updateItemInCart({ userId, productId, quantity });
-    res.status(response.statusCode || 200).send(response.data);
-    // No return statement here
-  } catch (error) {
-    console.error("Error updating item in cart:", error);
-    res.status(500).json({ error: "An unexpected error occurred" });
-    // No return statement here
   }
-});
+);
+
+// Delete item from cart
+router.delete(
+  "/items/:productId",
+  validateJWT,
+  async (req: ExtendRequest, res: Response) => {
+    try {
+      const userId = getUserIdFromRequest(req);
+      if (!userId) {
+        res.status(400).json({ error: "User ID not found in token" });
+        return;
+      }
+
+      const { productId } = req.params;
+      const response = await deletItemInCart({ userId, productId });
+      res.status(response.statusCode).send(response.data);
+    } catch (error) {
+      console.error("Error deleting item from cart:", error);
+      res.status(500).json({ error: "An unexpected error occurred" });
+    }
+  }
+);
+
 export default router;
